@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="gl">
+<head>
+  <meta charset="UTF-8">
+  <title>Buscaminas Galiza</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" type="image/png" href="assets/favicon.png" sizes="32x32">
+  <link rel="icon" type="image/png" href="assets/favicon.png" sizes="192x192">
+  <link rel="apple-touch-icon" href="assets/favicon.png">  
+</head>
+<body>
+  <div id="sidebar">
+    <div id="title">Buscaminas Galiza</div>
+    <div id="desc">
+      Cada celda representa unha rexión do cadro sobre a silueta de Galicia. As minas son eucaliptais perigosos.<br><br>
+      <i>Fai clic para revelar zonas seguras. Os números indican cantas minas hai ao redor. Click dereito para 🚩.</i>
+    </div>
+    <div class="row">
+      Dificultade:
+      <select id="difficulty">
+        <option value="easy">Fácil</option>
+        <option value="medium" selected>Media</option>
+        <option value="hard">Difícil</option>
+      </select>
+      <button id="reset">Novo mapa</button>
+    </div>
+    <span id="status"></span>
+  </div>
+
+  <div id="game-container">
+    <div id="galicia-grid"></div>
+  </div>
+
+  <div id="histopanel">
+    <h3>Distribución de números</h3>
+    <canvas id="histogram"></canvas>
+    <div style="font-size:0.97em;color:#333;margin-top:0.7em;text-align:center;">
+      Cada barra mostra cantas celas conteñen ese número (minas adxacentes).
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,167 @@
+/* Estilo base que ya tenías */
+body {
+  margin: 0;
+  font-family: 'Space Grotesk', system-ui, sans-serif;
+  background: linear-gradient(#87ceeb, #e0f7fa);
+  display: flex;
+  flex-direction: row;
+  height: 100vh;
+  color: #111;
+  width: 100vw;
+}
+
+header, footer {
+  padding: 0.5rem 1rem;
+  background: rgba(255,255,255,0.6);
+  backdrop-filter: blur(6px);
+}
+
+main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+canvas {
+  background: #c8e6c9;
+  box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+/* --- Estilo migrado del index.html anterior --- */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+#sidebar {
+  width: 320px; min-width: 220px; max-width: 350px;
+  padding: 28px 18px 22px 34px;
+  background: #fff; border-right: 1px solid #eee;
+  box-shadow: 2px 0 8px rgba(0,0,0,0.05);
+  display: flex; flex-direction: column;
+  justify-content: flex-start; align-items: flex-start;
+  height: 100vh; z-index: 2; box-sizing: border-box;
+}
+
+#title {
+  font-size: 1.7rem; font-weight: 700;
+  margin-bottom: 0.7em; letter-spacing: -0.5px; line-height: 1.1;
+}
+
+#desc {
+  font-size: 1.07em; color: #222;
+  margin-bottom: 1.4em; line-height: 1.38;
+}
+
+.row {
+  display:flex; gap:8px; align-items:center; flex-wrap:wrap;
+}
+
+select, button {
+  padding: 0.55em 0.9em;
+  border-radius: 20px;
+  border: 1px solid #ddd;
+  background:#fff;
+  cursor:pointer;
+}
+
+#reset {
+  margin-top: 0.6em;
+  padding: 0.7em 1.2em;
+  border-radius: 24px;
+  border: none;
+  background: #111;
+  color: #fff;
+  font-weight: bold;
+  font-size: 1.02em;
+  transition: background 0.2s;
+}
+#reset:hover { background: #444; }
+
+#status {
+  margin-top: 1.1em;
+  font-weight: bold;
+  font-size: 1.02em;
+  color: #b80000;
+  min-height: 2.1em;
+  letter-spacing: 0.2px;
+  word-break: break-word;
+  display: block;
+}
+
+#game-container {
+  flex: 1; height: 100vh; display: flex;
+  align-items: center; justify-content: center;
+  background: #fafbfb; overflow: hidden;
+}
+
+#galicia-grid {
+  display: grid; border-radius: 18px; background: #FAFBFB;
+  box-shadow: 0 2px 20px rgba(80,80,80,0.06);
+  width: 120%; height: 120vh; margin: 15px; padding: 0; overflow: hidden;
+  justify-self: normal; align-self: normal;
+  max-width: 120vw; max-height: 120vh;
+}
+
+.cell {
+  aspect-ratio: 1/1; background: #fff; border-radius: 5px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1.03em; cursor: pointer; user-select: none;
+  transition: background 0.13s, box-shadow 0.13s, border 0.13s;
+  border: 1.2px solid #e6e6e6; min-width: 11px; min-height: 11px; position: relative;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+.cell.revealed {
+  background: #f0f0f0;
+  box-shadow: inset 0 1px 4px rgba(30,30,30,0.08);
+  cursor: default;
+  border: 1.2px solid #d4d4d4;
+}
+.cell.mine { color: transparent; }
+.cell.lost { color: transparent; }
+.cell.flagged { color: transparent; }
+.cell.disabled {
+  background: #cce8fa !important;
+  color: #b0b0b0;
+  pointer-events: none;
+  border: 1.1px solid #bbd7ea;
+}
+.cell.zero { color: #b6b6b6; }
+
+#histopanel {
+  width: 450px; min-width: 230px; max-width: 450px;
+  background: #fff; border-left: 1px solid #eee;
+  box-shadow: -2px 0 8px rgba(0,0,0,0.05);
+  height: 100vh; display: flex; flex-direction: column;
+  align-items: center; justify-content: flex-start;
+  padding: 24px 14px 18px 14px; box-sizing: border-box;
+  z-index: 2;
+}
+#histopanel h3 {
+  font-size: 1.19em;
+  font-weight: bold;
+  margin: 0 0 0.5em 0;
+  letter-spacing: 0.01em;
+}
+#histopanel canvas {
+  background: #fff; /* o transparent */
+  width: 95% !important;
+  max-width: 330px;
+  height: 190px !important;
+  margin: 0 auto;
+  display: block;
+}
+
+@media (max-width: 1350px) {
+  #sidebar { width: 180px; }
+  #histopanel { width: 180px; }
+}
+@media (max-width: 1100px) {
+  #sidebar, #histopanel { display: none; }
+}
