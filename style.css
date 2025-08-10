@@ -93,30 +93,59 @@ select, button {
   display: block;
 }
 
-#game-container {
-  flex: 1; height: 100vh; display: flex;
-  align-items: center; justify-content: center;
-  background: #fafbfb; overflow: hidden;
+#game-container{
+  flex:1;
+  height:100vh;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#fafbfb;
+  overflow:hidden;
 }
 
-#galicia-grid {
-  display: grid; border-radius: 18px; background: #FAFBFB;
-  box-shadow: 0 2px 20px rgba(80,80,80,0.06);
-  width: 120%; height: 120vh; margin: 15px; padding: 0; overflow: hidden;
-  justify-self: normal; align-self: normal;
-  max-width: 120vw; max-height: 120vh;
+#galicia-grid{
+  display:grid;
+  border-radius:18px;
+  background:#FAFBFB;
+  box-shadow:0 2px 20px rgba(80,80,80,0.06);
+  width:100%;
+  height:100%;
+  max-width:100vw;
+  max-height:100vh;
+  margin:12px;
+  padding:0;
+  overflow:hidden;
 }
 
-.cell {
-  aspect-ratio: 1/1; background: #fff; border-radius: 5px;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 1.03em; cursor: pointer; user-select: none;
-  transition: background 0.13s, box-shadow 0.13s, border 0.13s;
-  border: 1.2px solid #e6e6e6; min-width: 11px; min-height: 11px; position: relative;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
+.cell{
+  aspect-ratio:1/1;
+  background:#fff;
+  border-radius:6px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-weight:700;
+  font-size:clamp(10px, 2.1vh, 16px);
+  cursor:pointer;
+  user-select:none;
+  transition:background .13s, box-shadow .13s, border .13s;
+  border:1.2px solid #e6e6e6;
+  min-width:22px;     /* mejor toque en móvil */
+  min-height:22px;
+  background-repeat:no-repeat;
+  background-position:center;
+  background-size:contain;
 }
+
+/* Paneles: colapsa antes y deja más espacio al juego */
+@media (max-width: 1200px){
+  #sidebar{ width:220px; }
+  #histopanel{ width:220px; }
+}
+@media (max-width: 980px){
+  #sidebar, #histopanel{ display:none; }
+}
+
 .cell.revealed {
   background: #f0f0f0;
   box-shadow: inset 0 1px 4px rgba(30,30,30,0.08);

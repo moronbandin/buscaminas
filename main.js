@@ -29,7 +29,7 @@ const LOSE_MESSAGES = [
 
 let grid = [];            // [r][c] -> { inGalicia, revealed, flagged, isMine, adj, showEucalyptus }
 let nRows = BASE_ROWS, nCols = BASE_COLS;
-let insideCells = [];     
+let insideCells = [];
 let mineCount = 0;
 let revealedCount = 0;
 let gameOver = false;
@@ -38,13 +38,25 @@ let histogramChart = null;
 
 const statusEl = () => document.getElementById('status');
 const gridEl   = () => document.getElementById('galicia-grid');
+const gameContainer = () => document.getElementById('game-container');
+
+let ro = null; // ResizeObserver
 
 document.addEventListener('DOMContentLoaded', () => {
-  document.getElementById('reset').textContent = "🌱 Reforestar";
+  const resetBtn = document.getElementById('reset');
+  if (resetBtn) resetBtn.textContent = "🌱 Reforestar";
+
   document.getElementById('reset').addEventListener('click', start);
   document.getElementById('difficulty').addEventListener('change', start);
   start();
-  window.addEventListener('resize', renderGrid);
+
+  // Observa cambios reais de tamaño do contedor (moi útil en móbil/rotación)
+  if (!ro) {
+    ro = new ResizeObserver(() => renderGrid());
+    ro.observe(gameContainer());
+  }
+  // fallback extra
+  window.addEventListener('orientationchange', () => setTimeout(renderGrid, 100));
 });
 
 async function start() {
@@ -70,7 +82,7 @@ async function start() {
     for (let r = 0; r < nRows; r++) {
       for (let c = 0; c < nCols; c++) {
         const x = minX + (c + 0.5) * (maxX - minX) / nCols;
-        const y = maxY - (r + 0.5) * (maxY - minY) / nRows; 
+        const y = maxY - (r + 0.5) * (maxY - minY) / nRows;
         if (pointInMultiPolygon([x, y], geojson.features[0].geometry.coordinates)) {
           grid[r][c].inGalicia = true;
           insideCells.push([r, c]);
@@ -81,7 +93,6 @@ async function start() {
     const diffKey = document.getElementById('difficulty').value;
     const targetMines = Math.max(1, Math.round(insideCells.length * DIFF[diffKey]));
     placeMines(targetMines);
-
     calcAdj();
 
     revealedCount = 0;
@@ -129,13 +140,16 @@ function renderGrid() {
   const gridNode = gridEl();
   gridNode.innerHTML = '';
 
-  const sidebarWidth = document.getElementById('sidebar').offsetWidth || 0;
-  const rightPanelWidth = document.getElementById('histopanel').offsetWidth || 0;
-  const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0) - sidebarWidth - rightPanelWidth - 8;
-  const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0) - 6;
+  // Mide o espazo dispoñible REAL do contedor de xogo
+  const gc = gameContainer();
+  const vw = Math.max(0, gc.clientWidth - 8);
+  const vh = Math.max(0, gc.clientHeight - 8);
 
-  let cellSize = Math.floor(Math.min(vw / nCols, vh / nRows, 38));
-  cellSize = Math.max(cellSize, 11);
+  // Tamaño de cela responsivo con límites sanos
+  let cellSize = Math.min(vw / nCols, vh / nRows);
+  const MIN = 22; // toque cómodo en móbil
+  const MAX = 44; // non xigante en desktop
+  cellSize = Math.max(MIN, Math.min(MAX, Math.floor(cellSize)));
 
   gridNode.style.gridTemplateRows = `repeat(${nRows}, ${cellSize}px)`;
   gridNode.style.gridTemplateColumns = `repeat(${nCols}, ${cellSize}px)`;
@@ -175,6 +189,7 @@ function renderGrid() {
         else if (d.revealed) {
           div.classList.add('revealed');
           if (d.adj > 0) {
+            div.style.fontSize = Math.floor(cellSize * 0.55) + 'px';
             div.textContent = d.adj;
           } else {
             if (d.showEucalyptus) setIcon(div, ICON_EUCALIPTO, 0.80);
@@ -182,7 +197,8 @@ function renderGrid() {
           }
         }
         else if (d.flagged) {
-          div.textContent = '⚑';
+          div.textContent = '🚩';
+          div.style.fontSize = Math.floor(cellSize * 0.6) + 'px';
         }
       }
 
@@ -191,6 +207,9 @@ function renderGrid() {
       gridNode.appendChild(div);
     }
   }
+
+  // Redimensiona o histograma tamén
+  if (histogramChart && histogramChart.resize) histogramChart.resize();
 }
 
 function onClick(r, c) {
