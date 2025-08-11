@@ -27,18 +27,37 @@ const LOSE_MESSAGES = [
   "💰 O lobby eucalipteiro conseguiu outra plantación masiva."
 ];
 
+// Pequeno carrusel de datos (sen cifras exactas para non inventar)
+const FACTS = [
+  "🌿 O eucalipto é unha especie exótica en Galicia; medra rápido pero reduce a biodiversidade se se planta en monocultivo.",
+  "🔥 A maioría dos incendios concéntranse no verán, favorecidos por períodos de seca e ventos.",
+  "🌳 Bosques diversos (carballos, castiñeiros, bidueiros) reteñen mellor a humidade e son máis resistentes ao lume.",
+  "💧 A cobertura de solo e os ríos de ribeira actúan como cortalumes naturais cando están ben conservados.",
+  "👥 A xestión comunitaria e a prevención local son claves para reducir o risco de incendios.",
+  "🧩 Os mosaicos de usos (agrario, forestal, urbano) ben planificados reducen a continuidade do combustible.",
+];
+
 let grid = [];            // [r][c] -> { inGalicia, revealed, flagged, isMine, adj, showEucalyptus }
 let nRows = BASE_ROWS, nCols = BASE_COLS;
 let insideCells = [];
 let mineCount = 0;
 let revealedCount = 0;
+let flagCount = 0;
 let gameOver = false;
 let lastLostCell = null;
-let histogramChart = null;
+let factsTimer = null;
 
 const statusEl = () => document.getElementById('status');
 const gridEl   = () => document.getElementById('galicia-grid');
 const gameContainer = () => document.getElementById('game-container');
+
+// Stats panel elements
+const elTotalMines   = () => document.getElementById('stat-total-mines');
+const elFlagsPlaced  = () => document.getElementById('stat-flags-placed');
+const elMinesRemain  = () => document.getElementById('stat-mines-remain');
+const elProgressText = () => document.getElementById('progress-text');
+const elProgressBar  = () => document.getElementById('progress-fill');
+const elFact         = () => document.getElementById('fact-line');
 
 let ro = null; // ResizeObserver
 
@@ -64,6 +83,13 @@ async function start() {
     statusEl().textContent = '';
     gameOver = false;
     lastLostCell = null;
+    flagCount = 0;
+    revealedCount = 0;
+
+    // reinicia carrusel de facts
+    if (factsTimer) clearInterval(factsTimer);
+    rotateFact(); // pon un xa
+    factsTimer = setInterval(rotateFact, 12000);
 
     const res = await fetch(GEOJSON_PATH);
     if(!res.ok) throw new Error('GeoJSON not found');
@@ -95,9 +121,8 @@ async function start() {
     placeMines(targetMines);
     calcAdj();
 
-    revealedCount = 0;
     renderGrid();
-    renderHistogram();
+    updateStats(); // inicializa panel
   } catch (e) {
     console.error(e);
     statusEl().textContent = 'Erro cargando o mapa (GeoJSON). Lembra abrir cun servidor local.';
@@ -145,7 +170,7 @@ function renderGrid() {
   const vw = Math.max(0, gc.clientWidth - 8);
   const vh = Math.max(0, gc.clientHeight - 8);
 
-  // Tamaño de cela responsivo con límites sanos
+  // Tamaño de cela responsivo con límites
   let cellSize = Math.min(vw / nCols, vh / nRows);
   const MIN = 22; // toque cómodo en móbil
   const MAX = 44; // non xigante en desktop
@@ -207,9 +232,6 @@ function renderGrid() {
       gridNode.appendChild(div);
     }
   }
-
-  // Redimensiona o histograma tamén
-  if (histogramChart && histogramChart.resize) histogramChart.resize();
 }
 
 function onClick(r, c) {
@@ -236,6 +258,7 @@ function onClick(r, c) {
     }
   }
   renderGrid();
+  updateStats();
 }
 
 function floodReveal(r, c) {
@@ -264,43 +287,48 @@ function onFlag(r, c) {
   const cell = grid[r][c];
   if (!cell.inGalicia || cell.revealed) return;
   cell.flagged = !cell.flagged;
+  flagCount += cell.flagged ? 1 : -1;
   renderGrid();
+  updateStats();
 }
 
 function revealAll() {
   for (const [r, c] of insideCells) grid[r][c].revealed = true;
   renderGrid();
+  updateStats();
 }
 
-function renderHistogram() {
-  const counts = Array(9).fill(0);
-  for (const [r,c] of insideCells) {
-    const d = grid[r][c];
-    if (!d.isMine) counts[Math.max(0, Math.min(8, d.adj))]++;
-  }
+/* ======= NOVO: Panel de estatísticas ======= */
+function updateStats() {
+  if (!elTotalMines()) return; // por se aínda non cargou o DOM
 
-  const ctx = document.getElementById('histogram').getContext('2d');
-  if (histogramChart) histogramChart.destroy();
-  histogramChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: ['0','1','2','3','4','5','6','7','8'],
-      datasets: [{
-        label: 'Celas',
-        data: counts,
-        backgroundColor: counts.map((v,i) => i>=3 ? '#ed6b63' : '#eee'),
-        borderColor: '#ccc',
-        borderWidth: 1
-      }]
-    },
-    options: {
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { title: { display: true, text: 'Minas adxacentes', font:{ weight:'bold' } } },
-        y: { title: { display: true, text: 'Número de celas', font:{ weight:'bold' } }, beginAtZero: true, ticks: { precision:0 } }
-      }
+  const safeTotal = Math.max(1, insideCells.length - mineCount);
+  const pct = Math.min(100, Math.max(0, Math.round((revealedCount / safeTotal) * 100)));
+
+  // Contadores
+  elTotalMines().textContent  = mineCount.toString();
+  elFlagsPlaced().textContent = flagCount.toString();
+  elMinesRemain().textContent = Math.max(0, mineCount - flagCount).toString();
+
+  // Progreso “salvando Galicia”
+  elProgressText().textContent = `${pct}% de celas seguras reveladas`;
+  elProgressBar().style.width = pct + '%';
+
+  // Se fin do xogo, texto acorde
+  if (gameOver) {
+    if (revealedCount >= safeTotal) {
+      elProgressText().textContent = '✅ Galicia a salvo!';
+      elProgressBar().style.width = '100%';
+    } else {
+      elProgressText().textContent = '💥 Interrompido por un incendio';
     }
-  });
+  }
+}
+
+function rotateFact() {
+  if (!elFact()) return;
+  const i = Math.floor(Math.random() * FACTS.length);
+  elFact().textContent = FACTS[i];
 }
 
 /* Utilidades Geo */

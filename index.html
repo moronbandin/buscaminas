@@ -34,14 +34,42 @@
   </div>
 
   <div id="histopanel">
-    <h3>Distribución de números</h3>
-    <canvas id="histogram"></canvas>
-    <div style="font-size:0.97em;color:#333;margin-top:0.7em;text-align:center;">
-      Cada barra mostra cantas celas conteñen ese número (minas adxacentes).
+    <h3>Estado da partida</h3>
+  
+    <div class="statline">
+      <span>💣 Minas totais:</span>
+      <strong id="stat-total-mines">—</strong>
+    </div>
+    <div class="statline">
+      <span>🚩 Postas:</span>
+      <strong id="stat-flags-placed">—</strong>
+    </div>
+    <div class="statline">
+      <span>⏳ Estimadas por descubrir:</span>
+      <strong id="stat-mines-remain">—</strong>
+    </div>
+  
+    <div class="progress-block" style="margin-top:1rem;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">
+        <span>🛡️ Progreso: salvar Galicia</span>
+        <span id="progress-text" style="font-weight:600;">0%</span>
+      </div>
+      <div class="progress-bar" style="width:100%;height:10px;background:#eee;border-radius:999px;overflow:hidden;">
+        <div id="progress-fill" style="height:100%;width:0%;background:#5cb85c;"></div>
+      </div>
+    </div>
+  
+    <h3 style="margin-top:1.2rem;">Coñece o monte</h3>
+    <div id="fact-line" style="font-size:0.95em;line-height:1.35;color:#333;">
+      —
+    </div>
+  
+    <div style="font-size:0.85em;color:#666;margin-top:0.8rem;">
+      As cifras exactas varían segundo as fontes. Este xogo busca concienciar: a prevención, a diversidade forestal e a xestión sostíbel salvan vidas e territorio.
     </div>
   </div>
-
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> -->
   <script src="main.js"></script>
 </body>
 </html>
