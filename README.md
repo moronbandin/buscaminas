@@ -1,58 +1,72 @@
 # 🌿 Buscaminas Galiza
 
-Versión do clásico **Buscaminas** ambientada na silueta de Galiza.  
-As minas son eucaliptais, unha especie que hoxe ocupa arredor de **409.000 hectáreas**, case o **28% da superficie forestal galega**. A súa expansión multiplicouse por dez nos últimos 50 anos, até o punto de que **un de cada tres árbores en Galiza é xa un eucalipto**.
+Versión do clásico **Buscaminas** ambientada na silueta de Galicia. O proxecto
+emprega o mapa como recurso lúdico para falar da diversidade forestal, da
+prevención e da xestión do territorio.
 
-![Captura de pantalla](screenshot.png)
+## Características
 
----
+- Taboleiro coa silueta de Galicia xerada desde un ficheiro GeoJSON.
+- Tres niveis de dificultade.
+- Primeiro movemento sempre seguro.
+- Contadores e progreso da partida en tempo real.
+- Controis con rato, teclado e pantalla táctil.
+- Modo bandeira e pulsación longa para dispositivos táctiles.
+- Deseño adaptado a escritorio e móbil.
+- Sen dependencias de execución.
 
-## 🎯 Características
+## Como xogar
 
-- **Mapa galego**: o taboleiro adopta a silueta da nosa terra.
-- **Iconas personalizadas**: 🌿 eucaliptos para minas, 🔥 lume ao perder.
-- **Estatísticas en tempo real**: histograma cos números revelados.
-- **Tres niveis de dificultade**: Fácil, Media e Difícil.
-- **Xogo clásico**:
-  - Click esquerdo → Revelar cela.
-  - Click dereito → Marcar 🚩.
-- **Adaptábel a móbil e escritorio**.
-- Sen dependencias pesadas (só Chart.js para o gráfico).
+1. Inicia un servidor local no directorio do proxecto:
 
----
+   ```bash
+   python3 -m http.server 8000
+   ```
 
-## 🚀 Como xogar
+2. Abre <http://localhost:8000>.
+3. Revela zonas seguras e usa os números para deducir onde están as minas.
+4. Marca unha mina con clic dereito, pulsación longa ou co botón
+   **Bandeira**.
 
-1. Escolle dificultade no panel esquerdo.
-2. Revela celas seguras e evita as minas 🌿.
-3. Usa os números como pistas para deducir onde están as minas.
+## Desenvolvemento
 
----
+As probas da lóxica pura execútanse con:
 
-## 📂 Estrutura do proxecto
-
+```bash
+npm test
 ```
 
+## Estrutura
+
+```text
 .
-├── index.html
-├── style.css
-├── main.js
 ├── assets/
-│   ├── eucalipto.png
-│   └── lume.png
+│   ├── icons/
+│   │   ├── eucalipto.png
+│   │   └── lume.png
+│   ├── favicon.png
+│   └── galicia.geojson
+├── test/
+│   └── game-core.test.js
+├── game-core.js
+├── index.html
+├── main.js
+├── style.css
+├── LICENSE
 └── README.md
+```
 
-````
+## Nota sobre o contido ambiental
 
----
+Os textos da interface son divulgativos e evitan cifras que poidan quedar
+desactualizadas. Para datos ambientais concretos débense consultar fontes
+oficiais, indicando sempre a fonte e a data de referencia.
 
-## 📜 Licenza
+## Licenza
 
-Este proxecto está baixo licenza MIT.
-Podes usalo, modificalo e redistribuílo libremente, citando a autoría.
+[MIT](LICENSE).
 
----
+## Créditos
 
-## 💡 Créditos
-
-Inspirado no [*Minesweeper* turístico](https://github.com/PlayableDataLab/004_tourist-minesweeper) de PlayableDataLab.
+Inspirado no [*Minesweeper* turístico](https://github.com/PlayableDataLab/004_tourist-minesweeper)
+de PlayableDataLab.

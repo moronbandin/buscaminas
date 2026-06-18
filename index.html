@@ -2,74 +2,88 @@
 <html lang="gl">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Un buscaminas ambientado na silueta de Galicia.">
+  <meta name="theme-color" content="#173f35">
   <title>Buscaminas Galiza</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
-  <link rel="icon" type="image/png" href="assets/favicon.png" sizes="32x32">
-  <link rel="icon" type="image/png" href="assets/favicon.png" sizes="192x192">
-  <link rel="apple-touch-icon" href="assets/favicon.png">  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css?v=3">
+  <link rel="icon" type="image/png" href="assets/favicon.png">
+  <link rel="apple-touch-icon" href="assets/favicon.png">
 </head>
 <body>
-  <div id="sidebar">
-    <div id="title">Buscaminas Galiza</div>
-    <div id="desc">
-      Cada celda representa unha rexión do cadro sobre a silueta de Galicia. As minas son eucaliptais perigosos.<br><br>
-      <i>Fai clic para revelar zonas seguras. Os números indican cantas minas hai ao redor. Click dereito para 🚩.</i>
+  <header class="sidebar">
+    <div>
+      <p class="eyebrow">Xogo e territorio</p>
+      <h1>Buscaminas Galiza</h1>
+      <p class="description">
+        Revela zonas seguras sobre a silueta de Galicia. Os números indican
+        cantas minas hai arredor.
+      </p>
     </div>
-    <div class="row">
-      Dificultade:
+
+    <div class="controls" aria-label="Controis da partida">
+      <label for="difficulty">Dificultade</label>
       <select id="difficulty">
         <option value="easy">Fácil</option>
         <option value="medium" selected>Media</option>
         <option value="hard">Difícil</option>
       </select>
-      <button id="reset">Novo mapa</button>
+      <button id="reset" class="primary" type="button">🌱 Reforestar</button>
+      <button id="flag-mode" type="button" aria-pressed="false">🚩 Bandeira</button>
     </div>
-    <span id="status"></span>
-  </div>
 
-  <div id="game-container">
-    <div id="galicia-grid"></div>
-  </div>
+    <p class="help">
+      Clic para revelar; clic dereito, pulsación longa ou modo bandeira para marcar.
+    </p>
+    <p id="status" role="status" aria-live="polite" data-type="neutral"></p>
+  </header>
 
-  <div id="histopanel">
-    <h3>Estado da partida</h3>
-  
-    <div class="statline">
-      <span>💣 Minas totais:</span>
-      <strong id="stat-total-mines">—</strong>
-    </div>
-    <div class="statline">
-      <span>🚩 Postas:</span>
-      <strong id="stat-flags-placed">—</strong>
-    </div>
-    <div class="statline">
-      <span>⏳ Estimadas por descubrir:</span>
-      <strong id="stat-mines-remain">—</strong>
-    </div>
-  
-    <div class="progress-block" style="margin-top:1rem;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:0.35rem;">
-        <span>🛡️ Progreso: salvar Galicia</span>
-        <span id="progress-text" style="font-weight:600;">0%</span>
+  <main id="game-container" aria-label="Taboleiro de Buscaminas Galiza">
+    <div
+      id="galicia-grid"
+      role="grid"
+      aria-label="Taboleiro de 36 filas por 36 columnas"
+      aria-busy="true"
+    ></div>
+  </main>
+
+  <aside class="info-panel" aria-label="Información da partida">
+    <section>
+      <h2>Estado da partida</h2>
+      <div class="stats">
+        <span>💣 Minas <strong id="stat-total-mines">—</strong></span>
+        <span>🚩 Postas <strong id="stat-flags-placed">—</strong></span>
+        <span>⏳ Restantes <strong id="stat-mines-remain">—</strong></span>
       </div>
-      <div class="progress-bar" style="width:100%;height:10px;background:#eee;border-radius:999px;overflow:hidden;">
-        <div id="progress-fill" style="height:100%;width:0%;background:#5cb85c;"></div>
+      <div class="progress-heading">
+        <span>Progreso</span>
+        <strong id="progress-text">0%</strong>
       </div>
-    </div>
-  
-    <h3 style="margin-top:1.2rem;">Coñece o monte</h3>
-    <div id="fact-line" style="font-size:0.95em;line-height:1.35;color:#333;">
-      —
-    </div>
-  
-    <div style="font-size:0.85em;color:#666;margin-top:0.8rem;">
-      As cifras exactas varían segundo as fontes. Este xogo busca concienciar: a prevención, a diversidade forestal e a xestión sostíbel salvan vidas e territorio.
-    </div>
-  </div>
-  
-  <!-- <script src="https://cdn.jsdelivr.net/npm/chart.js"></script> -->
-  <script src="main.js"></script>
+      <div
+        class="progress-bar"
+        role="progressbar"
+        aria-label="Zonas seguras reveladas"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
+        <div id="progress-fill"></div>
+      </div>
+    </section>
+
+    <section class="fact">
+      <h2>Coñece o monte</h2>
+      <p id="fact-line">—</p>
+      <p class="note">
+        Mensaxes divulgativas xerais: consulta fontes oficiais para obter datos
+        ambientais actualizados.
+      </p>
+    </section>
+  </aside>
+
+  <script type="module" src="main.js?v=3"></script>
 </body>
 </html>

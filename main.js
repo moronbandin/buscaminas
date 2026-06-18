@@ -1,382 +1,369 @@
+import {
+  bbox,
+  calcAdjacencies,
+  floodReveal,
+  flattenMultiPolygon,
+  hasWon,
+  placeMines,
+  pointInMultiPolygon,
+  protectFirstMove,
+} from './game-core.js';
+
 const GEOJSON_PATH = 'assets/galicia.geojson';
 const ICON_EUCALIPTO = 'assets/icons/eucalipto.png';
 const ICON_LUME = 'assets/icons/lume.png';
+const ROWS = 36;
+const COLS = 36;
+const DIFFICULTIES = { easy: 0.12, medium: 0.17, hard: 0.22 };
 
-// Tamaño do grid
-const BASE_ROWS = 36;
-const BASE_COLS = 36;
+const LOSE_MESSAGES = [
+  '🔥 A Xunta declarou que o lume foi “controlado”… dende Madrid.',
+  '📄 Un novo PXOM converteu a fraga en chalés adosados.',
+  '🏭 A celulosa pediu madeira “de proximidade” para aforrar transporte.',
+  '💶 Subvención europea para “bioeconomía”… a base de eucalipto.',
+  '🚜 Alguén confundiu o monte cun campo de golf.',
+  '🌲 Plantación experimental: 100% eucalipto, 0% sentido común.',
+  '🔥 Prendeuse lume para recalificar o terreo.',
+  '📉 ENCE estaba en números vermellos e precisaba madeira.',
+  '🏭 ALTRI precisaba pasta de celulosa con urxencia.',
+  '💰 O lobby eucalipteiro conseguiu outra plantación masiva.',
+];
 
-// % de minas dentro de Galicia por dificultade
-const DIFF = {
-  easy:   0.12,
-  medium: 0.17,
-  hard:   0.22
+const FACTS = [
+  '🌿 O eucalipto é unha especie exótica en Galicia; os monocultivos reducen a diversidade do territorio.',
+  '🔥 A seca, a calor, o vento e a continuidade do combustible aumentan o risco de grandes incendios.',
+  '🌳 Os bosques diversos adoitan responder mellor ás perturbacións ca unha plantación uniforme.',
+  '💧 A vexetación de ribeira e os solos ben conservados axudan a reter humidade.',
+  '👥 A xestión comunitaria e a prevención local son claves para reducir o risco de incendios.',
+  '🧩 Os mosaicos de usos agrarios e forestais poden frear a continuidade do combustible.',
+];
+
+const elements = {
+  difficulty: document.getElementById('difficulty'),
+  fact: document.getElementById('fact-line'),
+  flagMode: document.getElementById('flag-mode'),
+  game: document.getElementById('game-container'),
+  grid: document.getElementById('galicia-grid'),
+  minesRemain: document.getElementById('stat-mines-remain'),
+  progressBar: document.getElementById('progress-fill'),
+  progressText: document.getElementById('progress-text'),
+  reset: document.getElementById('reset'),
+  status: document.getElementById('status'),
+  flagsPlaced: document.getElementById('stat-flags-placed'),
+  totalMines: document.getElementById('stat-total-mines'),
 };
 
-// Mensaxes aleatorias ao perder
-const LOSE_MESSAGES = [
-  "🔥 A Xunta declarou que o lume foi ‘controlado’... dende Madrid.",
-  "📄 Un novo PXOM converteu a fraga en chalés adosados.",
-  "🏭 A celulosa pediu madeira ‘de proximidade’ para aforrar transporte.",
-  "💶 Subvención europea para ‘bioeconomía’... a base de eucalipto.",
-  "🚜 Alguén confundiu o monte cun campo de golf.",
-  "🌲 Plantación experimental: 100% eucalipto, 0% sentido común.",
-  "🔥 Prendeuse lume para recalificar o terreo.",
-  "📉 ENCE estaba en números vermellos e precisaba madeira.",
-  "🏭 ALTRI precisaba pasta de celulosa con urxencia.",
-  "💰 O lobby eucalipteiro conseguiu outra plantación masiva."
-];
-
-// Pequeno carrusel de datos (sen cifras exactas para non inventar)
-const FACTS = [
-  "🌿 O eucalipto é unha especie exótica en Galicia; medra rápido pero reduce a biodiversidade se se planta en monocultivo.",
-  "🔥 A maioría dos incendios concéntranse no verán, favorecidos por períodos de seca e ventos.",
-  "🌳 Bosques diversos (carballos, castiñeiros, bidueiros) reteñen mellor a humidade e son máis resistentes ao lume.",
-  "💧 A cobertura de solo e os ríos de ribeira actúan como cortalumes naturais cando están ben conservados.",
-  "👥 A xestión comunitaria e a prevención local son claves para reducir o risco de incendios.",
-  "🧩 Os mosaicos de usos (agrario, forestal, urbano) ben planificados reducen a continuidade do combustible.",
-];
-
-let grid = [];            // [r][c] -> { inGalicia, revealed, flagged, isMine, adj, showEucalyptus }
-let nRows = BASE_ROWS, nCols = BASE_COLS;
+let grid = [];
 let insideCells = [];
+let cellNodes = [];
 let mineCount = 0;
 let revealedCount = 0;
 let flagCount = 0;
+let firstMove = true;
 let gameOver = false;
+let won = false;
+let flagMode = false;
 let lastLostCell = null;
 let factsTimer = null;
+let geojsonPromise = null;
+let startSequence = 0;
+let longPressTimer = null;
+let suppressNextClick = false;
 
-const statusEl = () => document.getElementById('status');
-const gridEl   = () => document.getElementById('galicia-grid');
-const gameContainer = () => document.getElementById('game-container');
+elements.reset.addEventListener('click', start);
+elements.difficulty.addEventListener('change', start);
+elements.flagMode.addEventListener('click', toggleFlagMode);
+window.addEventListener('resize', resizeGrid, { passive: true });
+window.addEventListener('beforeunload', () => clearInterval(factsTimer));
 
-// Stats panel elements
-const elTotalMines   = () => document.getElementById('stat-total-mines');
-const elFlagsPlaced  = () => document.getElementById('stat-flags-placed');
-const elMinesRemain  = () => document.getElementById('stat-mines-remain');
-const elProgressText = () => document.getElementById('progress-text');
-const elProgressBar  = () => document.getElementById('progress-fill');
-const elFact         = () => document.getElementById('fact-line');
-
-let ro = null; // ResizeObserver
-
-document.addEventListener('DOMContentLoaded', () => {
-  const resetBtn = document.getElementById('reset');
-  if (resetBtn) resetBtn.textContent = "🌱 Reforestar";
-
-  document.getElementById('reset').addEventListener('click', start);
-  document.getElementById('difficulty').addEventListener('change', start);
-  start();
-
-  // Observa cambios reais de tamaño do contedor (moi útil en móbil/rotación)
-  if (!ro) {
-    ro = new ResizeObserver(() => renderGrid());
-    ro.observe(gameContainer());
-  }
-  // fallback extra
-  window.addEventListener('orientationchange', () => setTimeout(renderGrid, 100));
-});
+start();
 
 async function start() {
+  const sequence = ++startSequence;
+  setStatus('Preparando o monte…', 'neutral');
+  elements.grid.setAttribute('aria-busy', 'true');
+
   try {
-    statusEl().textContent = '';
-    gameOver = false;
-    lastLostCell = null;
-    flagCount = 0;
-    revealedCount = 0;
+    const geojson = await loadGeojson();
+    if (sequence !== startSequence) return;
 
-    // reinicia carrusel de facts
-    if (factsTimer) clearInterval(factsTimer);
-    rotateFact(); // pon un xa
-    factsTimer = setInterval(rotateFact, 12000);
-
-    const res = await fetch(GEOJSON_PATH);
-    if(!res.ok) throw new Error('GeoJSON not found');
-    const geojson = await res.json();
-
-    const coords = flattenMultiPolygon(geojson.features[0].geometry);
-    const [minX, minY, maxX, maxY] = bbox(coords);
-
-    grid = Array.from({length: nRows}, () =>
-      Array.from({length: nCols}, () => ({
-        inGalicia: false, revealed: false, flagged: false, isMine: false, adj: 0, showEucalyptus: false
-      }))
+    resetState();
+    buildBoardShape(geojson);
+    const target = Math.max(
+      1,
+      Math.round(insideCells.length * DIFFICULTIES[elements.difficulty.value]),
     );
-    insideCells = [];
+    mineCount = placeMines(grid, insideCells, target);
+    calcAdjacencies(grid, insideCells);
+    buildGridDom();
+    resizeGrid();
+    renderAllCells();
+    updateStats();
+    setStatus('Primeiro movemento seguro. Boa sorte!', 'neutral');
+    elements.grid.setAttribute('aria-busy', 'false');
+    rotateFact();
+    clearInterval(factsTimer);
+    factsTimer = setInterval(rotateFact, 12000);
+  } catch (error) {
+    console.error(error);
+    elements.grid.setAttribute('aria-busy', 'false');
+    setStatus('Non se puido cargar o mapa. Abre o proxecto cun servidor local.', 'error');
+  }
+}
 
-    for (let r = 0; r < nRows; r++) {
-      for (let c = 0; c < nCols; c++) {
-        const x = minX + (c + 0.5) * (maxX - minX) / nCols;
-        const y = maxY - (r + 0.5) * (maxY - minY) / nRows;
-        if (pointInMultiPolygon([x, y], geojson.features[0].geometry.coordinates)) {
-          grid[r][c].inGalicia = true;
-          insideCells.push([r, c]);
-        }
+function loadGeojson() {
+  if (!geojsonPromise) {
+    geojsonPromise = fetch(GEOJSON_PATH).then((response) => {
+      if (!response.ok) throw new Error(`GeoJSON: ${response.status}`);
+      return response.json();
+    });
+  }
+  return geojsonPromise;
+}
+
+function resetState() {
+  grid = Array.from({ length: ROWS }, () =>
+    Array.from({ length: COLS }, () => ({
+      inGalicia: false,
+      revealed: false,
+      flagged: false,
+      isMine: false,
+      adj: 0,
+    })),
+  );
+  insideCells = [];
+  cellNodes = [];
+  revealedCount = 0;
+  flagCount = 0;
+  firstMove = true;
+  gameOver = false;
+  won = false;
+  lastLostCell = null;
+  setFlagMode(false);
+}
+
+function buildBoardShape(geojson) {
+  const geometry = geojson.features?.[0]?.geometry;
+  if (!geometry || geometry.type !== 'MultiPolygon') {
+    throw new Error('O GeoJSON non contén un MultiPolygon válido');
+  }
+
+  const [minX, minY, maxX, maxY] = bbox(flattenMultiPolygon(geometry));
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const x = minX + ((col + 0.5) * (maxX - minX)) / COLS;
+      const y = maxY - ((row + 0.5) * (maxY - minY)) / ROWS;
+      if (pointInMultiPolygon([x, y], geometry.coordinates)) {
+        grid[row][col].inGalicia = true;
+        insideCells.push([row, col]);
       }
     }
-
-    const diffKey = document.getElementById('difficulty').value;
-    const targetMines = Math.max(1, Math.round(insideCells.length * DIFF[diffKey]));
-    placeMines(targetMines);
-    calcAdj();
-
-    renderGrid();
-    updateStats(); // inicializa panel
-  } catch (e) {
-    console.error(e);
-    statusEl().textContent = 'Erro cargando o mapa (GeoJSON). Lembra abrir cun servidor local.';
   }
 }
 
-function placeMines(target) {
-  mineCount = 0;
-  for (const [r,c] of insideCells) {
-    Object.assign(grid[r][c], { isMine: false, revealed: false, flagged: false, showEucalyptus: false });
-  }
-  const bag = insideCells.slice();
-  shuffle(bag);
-  let i = 0;
-  while (mineCount < target && i < bag.length) {
-    const [r, c] = bag[i++];
-    grid[r][c].isMine = true;
-    mineCount++;
-  }
-}
+function buildGridDom() {
+  const fragment = document.createDocumentFragment();
+  elements.grid.replaceChildren();
+  cellNodes = Array.from({ length: ROWS }, () => Array(COLS));
 
-function calcAdj() {
-  for (const [r,c] of insideCells) {
-    if (grid[r][c].isMine) { grid[r][c].adj = 0; continue; }
-    let a = 0;
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
-        if (dr === 0 && dc === 0) continue;
-        const rr = r + dr, cc = c + dc;
-        if (rr < 0 || rr >= nRows || cc < 0 || cc >= nCols) continue;
-        if (!grid[rr][cc].inGalicia) continue;
-        if (grid[rr][cc].isMine) a++;
-      }
-    }
-    grid[r][c].adj = a;
-  }
-}
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const cell = grid[row][col];
+      const node = cell.inGalicia
+        ? document.createElement('button')
+        : document.createElement('span');
 
-function renderGrid() {
-  const gridNode = gridEl();
-  gridNode.innerHTML = '';
+      node.className = cell.inGalicia ? 'cell' : 'cell disabled';
+      node.dataset.row = row;
+      node.dataset.col = col;
 
-  // Mide o espazo dispoñible REAL do contedor de xogo
-  const gc = gameContainer();
-  const vw = Math.max(0, gc.clientWidth - 8);
-  const vh = Math.max(0, gc.clientHeight - 8);
-
-  // Tamaño de cela responsivo con límites
-  let cellSize = Math.min(vw / nCols, vh / nRows);
-  const MIN = 22; // toque cómodo en móbil
-  const MAX = 44; // non xigante en desktop
-  cellSize = Math.max(MIN, Math.min(MAX, Math.floor(cellSize)));
-
-  gridNode.style.gridTemplateRows = `repeat(${nRows}, ${cellSize}px)`;
-  gridNode.style.gridTemplateColumns = `repeat(${nCols}, ${cellSize}px)`;
-
-  const setIcon = (div, url, scale = 0.78) => {
-    const px = Math.floor(cellSize * scale);
-    div.style.backgroundImage = `url("${url}")`;
-    div.style.backgroundRepeat = 'no-repeat';
-    div.style.backgroundPosition = 'center';
-    div.style.backgroundSize = `${px}px ${px}px`;
-  };
-  const setCover = (div, url) => {
-    div.style.backgroundImage = `url("${url}")`;
-    div.style.backgroundRepeat = 'no-repeat';
-    div.style.backgroundPosition = 'center';
-    div.style.backgroundSize = 'cover';
-  };
-
-  for (let r = 0; r < nRows; r++) {
-    for (let c = 0; c < nCols; c++) {
-      const d = grid[r][c];
-      const div = document.createElement('div');
-      div.className = 'cell';
-      div.style.width = div.style.height = cellSize + 'px';
-
-      if (!d.inGalicia) {
-        div.classList.add('disabled');
+      if (cell.inGalicia) {
+        node.type = 'button';
+        node.setAttribute('role', 'gridcell');
+        node.addEventListener('click', () => handleCellAction(row, col));
+        node.addEventListener('contextmenu', (event) => {
+          event.preventDefault();
+          toggleFlag(row, col);
+        });
+        node.addEventListener('pointerdown', (event) => startLongPress(event, row, col));
+        node.addEventListener('pointerup', cancelLongPress);
+        node.addEventListener('pointercancel', cancelLongPress);
+        node.addEventListener('pointerleave', cancelLongPress);
       } else {
-        if (gameOver && !d.revealed) {
-          setCover(div, ICON_LUME);
-        }
-        else if (d.revealed && d.isMine) {
-          div.classList.add('mine');
-          setCover(div, ICON_LUME);
-          if (lastLostCell && lastLostCell[0] === r && lastLostCell[1] === c) div.classList.add('lost');
-        }
-        else if (d.revealed) {
-          div.classList.add('revealed');
-          if (d.adj > 0) {
-            div.style.fontSize = Math.floor(cellSize * 0.55) + 'px';
-            div.textContent = d.adj;
-          } else {
-            if (d.showEucalyptus) setIcon(div, ICON_EUCALIPTO, 0.80);
-            else div.classList.add('zero');
-          }
-        }
-        else if (d.flagged) {
-          div.textContent = '🚩';
-          div.style.fontSize = Math.floor(cellSize * 0.6) + 'px';
-        }
+        node.setAttribute('aria-hidden', 'true');
       }
 
-      div.onclick = () => { if (!gameOver) onClick(r, c); };
-      div.oncontextmenu = e => { e.preventDefault(); if (!gameOver) onFlag(r, c); };
-      gridNode.appendChild(div);
+      cellNodes[row][col] = node;
+      fragment.appendChild(node);
     }
   }
+
+  elements.grid.appendChild(fragment);
 }
 
-function onClick(r, c) {
-  const cell = grid[r][c];
-  if (!cell.inGalicia || cell.revealed || cell.flagged) return;
+function resizeGrid() {
+  if (!grid.length) return;
+  const width = Math.max(0, elements.game.clientWidth - 24);
+  const height = Math.max(0, elements.game.clientHeight - 24);
+  const compact = window.matchMedia('(max-width: 760px)').matches;
+  const minimum = compact ? 22 : 12;
+  const fitted = Math.floor(Math.min(width / COLS, height / ROWS));
+  const cellSize = Math.max(minimum, Math.min(32, fitted));
 
-  cell.revealed = true;
+  elements.grid.style.setProperty('--cell-size', `${cellSize}px`);
+  elements.grid.style.gridTemplateColumns = `repeat(${COLS}, var(--cell-size))`;
+  elements.grid.style.gridTemplateRows = `repeat(${ROWS}, var(--cell-size))`;
+}
+
+function handleCellAction(row, col) {
+  if (suppressNextClick) {
+    suppressNextClick = false;
+    return;
+  }
+  if (flagMode) toggleFlag(row, col);
+  else reveal(row, col);
+}
+
+function reveal(row, col) {
+  const cell = grid[row][col];
+  if (gameOver || !cell.inGalicia || cell.revealed || cell.flagged) return;
+
+  if (firstMove) {
+    protectFirstMove(grid, insideCells, row, col);
+    calcAdjacencies(grid, insideCells);
+    firstMove = false;
+  }
+
   if (cell.isMine) {
+    cell.revealed = true;
     gameOver = true;
-    lastLostCell = [r, c];
-    statusEl().innerHTML = LOSE_MESSAGES[Math.floor(Math.random() * LOSE_MESSAGES.length)];
-    revealAll();
+    lastLostCell = [row, col];
+    setStatus(LOSE_MESSAGES[Math.floor(Math.random() * LOSE_MESSAGES.length)], 'error');
   } else {
-    revealedCount++;
-    if (cell.adj === 0) {
-      cell.showEucalyptus = true;
-      floodReveal(r, c);
-    }
-    const safeTotal = insideCells.length - mineCount;
-    if (revealedCount >= safeTotal) {
+    const changed = floodReveal(grid, row, col);
+    revealedCount += changed.length;
+    if (hasWon(insideCells, mineCount, revealedCount)) {
       gameOver = true;
-      statusEl().innerHTML = '✅ Parabéns! Galicia a salvo.';
-      revealAll(true);
+      won = true;
+      setStatus('✅ Parabéns! Galicia a salvo.', 'success');
     }
   }
-  renderGrid();
+
+  renderAllCells();
   updateStats();
 }
 
-function floodReveal(r, c) {
-  const stack = [[r, c]];
-  while (stack.length) {
-    const [rr, cc] = stack.pop();
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
-        if (dr === 0 && dc === 0) continue;
-        const nr = rr + dr, nc = cc + dc;
-        if (nr < 0 || nr >= nRows || nc < 0 || nc >= nCols) continue;
-        const n = grid[nr][nc];
-        if (!n.inGalicia || n.revealed || n.flagged || n.isMine) continue;
-        n.revealed = true;
-        revealedCount++;
-        if (n.adj === 0) {
-          n.showEucalyptus = true;
-          stack.push([nr, nc]);
-        }
-      }
-    }
-  }
-}
-
-function onFlag(r, c) {
-  const cell = grid[r][c];
-  if (!cell.inGalicia || cell.revealed) return;
+function toggleFlag(row, col) {
+  const cell = grid[row][col];
+  if (gameOver || !cell.inGalicia || cell.revealed) return;
   cell.flagged = !cell.flagged;
   flagCount += cell.flagged ? 1 : -1;
-  renderGrid();
+  renderCell(row, col);
   updateStats();
 }
 
-function revealAll() {
-  for (const [r, c] of insideCells) grid[r][c].revealed = true;
-  renderGrid();
-  updateStats();
+function startLongPress(event, row, col) {
+  if (event.pointerType === 'mouse' || gameOver) return;
+  cancelLongPress();
+  longPressTimer = setTimeout(() => {
+    suppressNextClick = true;
+    toggleFlag(row, col);
+    navigator.vibrate?.(35);
+  }, 500);
 }
 
-/* ======= NOVO: Panel de estatísticas ======= */
-function updateStats() {
-  if (!elTotalMines()) return; // por se aínda non cargou o DOM
+function cancelLongPress() {
+  clearTimeout(longPressTimer);
+  longPressTimer = null;
+}
 
-  const safeTotal = Math.max(1, insideCells.length - mineCount);
-  const pct = Math.min(100, Math.max(0, Math.round((revealedCount / safeTotal) * 100)));
+function toggleFlagMode() {
+  setFlagMode(!flagMode);
+}
 
-  // Contadores
-  elTotalMines().textContent  = mineCount.toString();
-  elFlagsPlaced().textContent = flagCount.toString();
-  elMinesRemain().textContent = Math.max(0, mineCount - flagCount).toString();
+function setFlagMode(active) {
+  flagMode = active;
+  elements.flagMode.setAttribute('aria-pressed', String(active));
+  elements.flagMode.classList.toggle('active', active);
+  elements.flagMode.textContent = active ? '🚩 Marcando' : '🚩 Bandeira';
+}
 
-  // Progreso “salvando Galicia”
-  elProgressText().textContent = `${pct}% de celas seguras reveladas`;
-  elProgressBar().style.width = pct + '%';
+function renderAllCells() {
+  for (const [row, col] of insideCells) renderCell(row, col);
+}
 
-  // Se fin do xogo, texto acorde
-  if (gameOver) {
-    if (revealedCount >= safeTotal) {
-      elProgressText().textContent = '✅ Galicia a salvo!';
-      elProgressBar().style.width = '100%';
+function renderCell(row, col) {
+  const cell = grid[row][col];
+  const node = cellNodes[row]?.[col];
+  if (!node) return;
+
+  const lost = lastLostCell?.[0] === row && lastLostCell?.[1] === col;
+  const showMine = gameOver && cell.isMine;
+  const wrongFlag = gameOver && cell.flagged && !cell.isMine;
+
+  node.className = 'cell';
+  node.textContent = '';
+  node.style.backgroundImage = '';
+  node.disabled = gameOver || cell.revealed;
+
+  if (lost) node.classList.add('lost');
+  if (wrongFlag) {
+    node.classList.add('wrong-flag');
+    node.textContent = '✕';
+  } else if (showMine) {
+    node.classList.add('mine');
+    node.style.backgroundImage = `url("${won ? ICON_EUCALIPTO : ICON_LUME}")`;
+  } else if (cell.revealed) {
+    node.classList.add('revealed');
+    if (cell.adj > 0) {
+      node.textContent = cell.adj;
+      node.dataset.adj = cell.adj;
     } else {
-      elProgressText().textContent = '💥 Interrompido por un incendio';
+      node.classList.add('zero');
     }
+  } else if (cell.flagged) {
+    node.classList.add('flagged');
+    node.textContent = '🚩';
   }
+
+  node.setAttribute('aria-label', cellLabel(cell, row, col, wrongFlag, showMine));
+  node.setAttribute('aria-pressed', String(cell.flagged));
+}
+
+function cellLabel(cell, row, col, wrongFlag, showMine) {
+  const position = `Fila ${row + 1}, columna ${col + 1}`;
+  if (wrongFlag) return `${position}: bandeira incorrecta`;
+  if (showMine) return `${position}: mina`;
+  if (cell.flagged) return `${position}: marcada cunha bandeira`;
+  if (!cell.revealed) return `${position}: cela sen revelar`;
+  if (cell.adj === 0) return `${position}: zona segura, sen minas próximas`;
+  return `${position}: zona segura, ${cell.adj} minas próximas`;
+}
+
+function updateStats() {
+  const safeTotal = Math.max(1, insideCells.length - mineCount);
+  const percentage = Math.min(100, Math.round((revealedCount / safeTotal) * 100));
+
+  elements.totalMines.textContent = mineCount;
+  elements.flagsPlaced.textContent = flagCount;
+  elements.minesRemain.textContent = Math.max(0, mineCount - flagCount);
+  elements.progressBar.style.width = `${percentage}%`;
+  elements.progressBar.parentElement.setAttribute('aria-valuenow', String(percentage));
+  elements.progressText.textContent = `${percentage}% de zonas seguras`;
+
+  if (gameOver) {
+    elements.progressText.textContent = won
+      ? '✅ Galicia a salvo!'
+      : '💥 Partida interrompida';
+    if (won) elements.progressBar.style.width = '100%';
+  }
+}
+
+function setStatus(message, type) {
+  elements.status.textContent = message;
+  elements.status.dataset.type = type;
 }
 
 function rotateFact() {
-  if (!elFact()) return;
-  const i = Math.floor(Math.random() * FACTS.length);
-  elFact().textContent = FACTS[i];
+  elements.fact.textContent = FACTS[Math.floor(Math.random() * FACTS.length)];
 }
-
-/* Utilidades Geo */
-function flattenMultiPolygon(geom) {
-  const out = [];
-  for (const polygon of geom.coordinates) {
-    for (const ring of polygon) {
-      for (const [x, y] of ring) out.push([x, y]);
-    }
-  }
-  return out;
-}
-
-function bbox(coords) {
-  let minX =  Infinity, minY =  Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const [x,y] of coords) {
-    if (x < minX) minX = x;
-    if (y < minY) minY = y;
-    if (x > maxX) maxX = x;
-    if (y > maxY) maxY = y;
-  }
-  return [minX, minY, maxX, maxY];
-}
-
-function pointInMultiPolygon(pt, multiCoords) {
-  for (const polygon of multiCoords) {
-    let insideOuter = rayCast(pt, polygon[0]);
-    if (!insideOuter) continue;
-    let inHole = false;
-    for (let i = 1; i < polygon.length; i++) {
-      if (rayCast(pt, polygon[i])) { inHole = true; break; }
-    }
-    if (insideOuter && !inHole) return true;
-  }
-  return false;
-}
-function rayCast(pt, ring) {
-  const x = pt[0], y = pt[1];
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const xi = ring[i][0], yi = ring[i][1];
-    const xj = ring[j][0], yj = ring[j][1];
-    const intersect = ((yi > y) !== (yj > y)) &&
-      (x < (xj - xi) * (y - yi) / ((yj - yi) || 1e-12) + xi);
-    if (intersect) inside = !inside;
-  }
-  return inside;
-}
-
-/* Util varias */
-function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=(Math.random()*(i+1))|0; [a[i],a[j]]=[a[j],a[i]]; } }
